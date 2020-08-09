@@ -1,8 +1,11 @@
+//config .env file
+require('dotenv').config()
 // acquriring packages
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
+const encrypt = require("mongoose-encryption");
 const app = express();
 
 //using ejs templates
@@ -26,13 +29,13 @@ app.listen(port, function() {
 });
 
 //connecting to db
-mongoose.connect("mongodb://localhost:27017/userDB", {
+mongoose.connect("mongodb://" + process.env.DB_HOST + ":" + process.env.DB_PORT + "/" + process.env.DB_NAME, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 });
 
-//creating model for usersDB
-const User = mongoose.model("user", {
+//creating userSchema
+const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: 1
@@ -42,6 +45,15 @@ const User = mongoose.model("user", {
     required: 1
   }
 });
+
+//adding plugin to encrypt password
+userSchema.plugin(encrypt, {
+  secret: process.env.SECRET,
+  encryptedFields: ["password"]
+});
+
+//creating model for usersDB
+const User = mongoose.model("user", userSchema);
 
 //handling home route
 app.get("/", function(req, res) {
@@ -105,4 +117,4 @@ app.route("/login")
         }
       }
     )
-  })
+  });
