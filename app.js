@@ -5,8 +5,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
 const mongoose = require("mongoose");
-const encrypt = require("mongoose-encryption");
-const md5=require("md5");
+const bcrypt = require('bcrypt');
+const saltRounds = parseInt(process.env.SALT_ROUNDS);
 const app = express();
 
 //using ejs templates
@@ -39,11 +39,11 @@ mongoose.connect("mongodb://" + process.env.DB_HOST + ":" + process.env.DB_PORT 
 const userSchema = new mongoose.Schema({
   email: {
     type: String,
-    required: 1
+    required: "Please enter your email"
   },
   password: {
     type: String,
-    required: 1
+    required: "Please enter your password"
   }
 });
 
@@ -65,17 +65,23 @@ app.route("/register")
 
   //registering new user
   .post(function(req, res) {
-    //creating new user
-    let newUser = new User({
-      email: req.body.username,
-      password: md5(req.body.password)
-    });
-    //saving new user to db
-    newUser.save(function(err) {
+    //creating new user using bcrypt hashing
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
       if (err) {
         console.log(err);
       } else {
-        res.render("secrets");
+        let newUser = new User({
+          email: req.body.username,
+          password: hash
+        });
+        //saving new user to db
+        newUser.save(function(err) {
+          if (err) {
+            console.log(err);
+          } else {
+            res.render("secrets");
+          }
+        });
       }
     });
   });
@@ -92,24 +98,29 @@ app.route("/login")
   //validating user
   .post(function(req, res) {
     let username = req.body.username;
-    let password = md5(req.body.password);
+    let password = req.body.password;
+    //finding user
     User.findOne({
         email: username
       },
       function(err, foundUser) {
+        //handling error
         if (err) {
           console.log(err);
         } else {
           if (foundUser) {
-            if (foundUser.password === password) {
-              res.render("secrets");
-            } else {
-              console.log("Please check your password.");
-            }
+            //using bcrypt to change input into hash and compare
+            bcrypt.compare(password, foundUser.password, function(err, result) {
+              if (result === true) {
+                res.render("secrets");
+              } // handling wrong password
+              else {
+                console.log("Please check your password.");
+              }
+            });
           } else {
             console.log("No user exist for that email.");
           }
         }
-      }
-    )
+      });
   });
